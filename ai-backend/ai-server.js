@@ -35,10 +35,24 @@ if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
 // Firebase Admin SDK
 // --------------------------------------------------
 
-const serviceAccountPath = path.resolve(
-  process.cwd(),
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH
-);
+const configuredServiceAccountPath =
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+
+const renderSecretPath =
+  "/etc/secrets/serviceAccountKey.json";
+
+let serviceAccountPath;
+
+// Render Secret Files are available at /etc/secrets/<filename>.
+if (fs.existsSync(renderSecretPath)) {
+  serviceAccountPath = renderSecretPath;
+} else {
+  // Local development fallback.
+  serviceAccountPath = path.resolve(
+    process.cwd(),
+    configuredServiceAccountPath
+  );
+}
 
 if (!fs.existsSync(serviceAccountPath)) {
   console.error(
@@ -46,6 +60,10 @@ if (!fs.existsSync(serviceAccountPath)) {
   );
   process.exit(1);
 }
+
+console.log(
+  `✅ Firebase service account file found: ${serviceAccountPath}`
+);
 
 let serviceAccount;
 
@@ -338,13 +356,10 @@ app.get("/api/health", (req, res) => {
     ok: true,
     service: "EduMind AI Backend",
     status: "healthy",
-
     primaryModel: GEMINI_MODEL,
-
     fallbackModels: AI_MODELS.filter(
       (model) => model !== GEMINI_MODEL
     ),
-
     timestamp: new Date().toISOString(),
   });
 });
@@ -525,55 +540,85 @@ app.post(
       // ----------------------------------------------
 
       const prompt = `
+
 You are EduMind AI, an academic analytics assistant.
 
 Analyze only the student performance data supplied below.
 
 STUDENT DATA:
+
 ${studentData}
 
 Generate a professional academic analysis for a teacher,
+
 mentor, or academic administrator.
 
 Your response must contain exactly these sections:
 
 1. Overall Summary
+
 - Explain the overall attendance and performance situation.
+
 - Mention important patterns visible in the supplied data.
 
 2. Students Needing Attention
+
 - Identify students whose attendance is below 75%
+
   OR performance is below 40%.
+
 - Explain the measurable reason each student appears in this section.
+
 - Do not invent the cause of poor attendance or performance.
+
 - If nobody needs attention, clearly say so.
 
 3. Strong Performers
+
 - Identify students with attendance of at least 75%
+
   AND performance of at least 80%.
+
 - Mention their measurable strengths.
+
 - If there are no strong performers, clearly say so.
 
 4. Recommended Actions
+
 - Give practical actions a teacher or mentor can take.
+
 - Recommendations must be based only on the supplied data.
 
 5. Priority Level
+
 Classify the overall situation as exactly one of:
+
 - Low
+
 - Medium
+
 - High
 
 Important rules:
+
 - Do not invent marks.
+
 - Do not invent attendance.
+
 - Do not invent subjects.
+
 - Do not invent medical information.
+
 - Do not invent family information.
+
 - Do not invent reasons for poor performance.
+
 - Do not make claims that are not supported by the supplied data.
+
 - Use only the supplied student records.
+
 - Keep the analysis concise, professional, and actionable.
+
 `;
 
       // ----------------------------------------------
@@ -637,7 +682,6 @@ Important rules:
         return res.status(503).json({
           error:
             "AI service is temporarily unavailable. Please try again in a few moments.",
-
           details: message,
         });
       }
@@ -649,7 +693,6 @@ Important rules:
       return res.status(500).json({
         error:
           "Unable to generate AI insights. Please check the backend logs.",
-
         details: message,
       });
     }
@@ -685,6 +728,7 @@ app.use((error, req, res, next) => {
 // --------------------------------------------------
 // Start server
 // --------------------------------------------------
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log("");
 
